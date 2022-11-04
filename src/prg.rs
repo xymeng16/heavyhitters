@@ -2,11 +2,9 @@ use core::arch::x86_64::{
     __m128i, _mm_add_epi64, _mm_loadu_si128, _mm_set_epi64x, _mm_storeu_si128,
 };
 
-use aes::block_cipher::{generic_array::GenericArray, Block, BlockCipher, NewBlockCipher};
+use aes::cipher::{generic_array::GenericArray, Block, BlockEncrypt, StreamCipher, KeyInit, KeyIvInit};
 use aes::Aes128;
-use aes_ctr::stream_cipher::{NewStreamCipher, SyncStreamCipher};
-use aes_ctr::Aes128Ctr;
-
+use ctr::Ctr128LE;
 use rand::Rng;
 use rand_core::RngCore;
 
@@ -32,6 +30,7 @@ pub struct FixedKeyPrgStream {
 }
 
 use std::cell::RefCell;
+use aes::cipher::consts::U16;
 
 thread_local!(static FIXED_KEY_STREAM: RefCell<FixedKeyPrgStream> = RefCell::new(FixedKeyPrgStream::new()));
 
@@ -47,6 +46,8 @@ pub trait FromRng {
         self.from_rng(&mut rand::thread_rng());
     }
 }
+
+type Aes128Ctr = Ctr128LE<Aes128>;
 
 #[derive(Clone)]
 pub struct PrgStream {
@@ -235,8 +236,8 @@ impl FixedKeyPrgStream {
         self.have = 8 * AES_BLOCK_SIZE;
         self.buf_ptr = 0;
 
-        let block = GenericArray::clone_from_slice(&[0u8; 16]);
-        let mut block8 = GenericArray::clone_from_slice(&[block; 8]);
+        let block: GenericArray<u8, U16> = GenericArray::clone_from_slice(&[0u8; 16]);
+        let mut block8: GenericArray<GenericArray<u8, U16>, U16> = GenericArray::clone_from_slice(&[block; 8]);
 
         let mut cnts = [[0u8; AES_BLOCK_SIZE]; 8];
         for i in 0..8 {
